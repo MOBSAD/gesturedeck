@@ -2,30 +2,116 @@
 
 from __future__ import annotations
 
+import copy
 import math
+from pathlib import Path
 import queue
 import subprocess
 import threading
 import time
+import tomllib
+from typing import Any
 
-CAMERA_DEVICE = "/dev/video0"
-DISTANCIA_MINIMA = 25.0
-DISTANCIA_MAXIMA = 180.0
-SUAVIZACAO = 0.18
-INTERVALO_COMANDO = 0.15
-MUDANCA_MINIMA = 0.03
+
+CONFIGURACAO_PADRAO: dict[str, dict[str, Any]] = {
+    "interface": {"visible": True},
+    "camera": {"device": 0, "width": 640, "height": 480, "fps": 30},
+    "tracking": {
+        "process_every_n_frames": 2,
+        "detection_confidence": 0.65,
+        "tracking_confidence": 0.65,
+    },
+    "volume": {
+        "minimum_distance": 25.0,
+        "maximum_distance": 180.0,
+        "smoothing": 0.18,
+        "update_interval": 0.15,
+        "minimum_change": 0.03,
+    },
+}
+
+
+class ErroConfiguracao(ValueError):
+    """Indica uma opção inválida no arquivo de configuração."""
+
+
+def _validar_inteiro(valor: Any, nome: str, minimo: int = 0) -> None:
+    if isinstance(valor, bool) or not isinstance(valor, int):
+        raise ErroConfiguracao(f"'{nome}' deve ser um número inteiro.")
+    if valor < minimo:
+        raise ErroConfiguracao(f"'{nome}' deve ser maior ou igual a {minimo}.")
+
+
+def _validar_numero(
+    valor: Any, nome: str, minimo: float = 0.0, maximo: float | None = None
+) -> None:
+    if isinstance(valor, bool) or not isinstance(valor, (int, float)):
+        raise ErroConfiguracao(f"'{nome}' deve ser um número.")
+    if not math.isfinite(valor) or valor < minimo or (maximo is not None and valor > maximo):
+        intervalo = f"entre {minimo} e {maximo}" if maximo is not None else f"maior ou igual a {minimo}"
+        raise ErroConfiguracao(f"'{nome}' deve ser {intervalo}.")
+
+
+def carregar_configuracao(caminho: str | Path = "config.toml") -> dict[str, dict[str, Any]]:
+    """Lê, completa e valida a configuração do GestureDeck."""
+    configuracao = copy.deepcopy(CONFIGURACAO_PADRAO)
+    caminho = Path(caminho)
+
+    if caminho.exists():
+        try:
+            with caminho.open("rb") as arquivo:
+                dados = tomllib.load(arquivo)
+        except (OSError, tomllib.TOMLDecodeError) as erro:
+            raise ErroConfiguracao(f"Não foi possível ler '{caminho}': {erro}") from erro
+
+        for secao, valores in dados.items():
+            if secao not in configuracao:
+                continue
+            if not isinstance(valores, dict):
+                raise ErroConfiguracao(f"A seção '{secao}' deve ser uma tabela TOML.")
+            for opcao, valor in valores.items():
+                if opcao in configuracao[secao]:
+                    configuracao[secao][opcao] = valor
+
+    visible = configuracao["interface"]["visible"]
+    if not isinstance(visible, bool):
+        raise ErroConfiguracao("'interface.visible' deve ser true ou false.")
+
+    for opcao in ("device", "width", "height", "fps"):
+        minimo = 0 if opcao == "device" else 1
+        _validar_inteiro(configuracao["camera"][opcao], f"camera.{opcao}", minimo)
+
+    _validar_inteiro(
+        configuracao["tracking"]["process_every_n_frames"],
+        "tracking.process_every_n_frames",
+        1,
+    )
+    for opcao in ("detection_confidence", "tracking_confidence"):
+        _validar_numero(configuracao["tracking"][opcao], f"tracking.{opcao}", 0.0, 1.0)
+
+    for opcao in ("minimum_distance", "maximum_distance", "update_interval", "minimum_change"):
+        _validar_numero(configuracao["volume"][opcao], f"volume.{opcao}")
+    _validar_numero(configuracao["volume"]["smoothing"], "volume.smoothing", 0.0, 1.0)
+    if configuracao["volume"]["maximum_distance"] <= configuracao["volume"]["minimum_distance"]:
+        raise ErroConfiguracao("'volume.maximum_distance' deve ser maior que 'volume.minimum_distance'.")
+    if configuracao["volume"]["minimum_change"] > 1:
+        raise ErroConfiguracao("'volume.minimum_change' deve estar entre 0.0 e 1.0.")
+
+    return configuracao
 
 
 def limitar(valor: float, minimo: float, maximo: float) -> float:
     return max(minimo, min(valor, maximo))
 
 
-def converter_distancia_em_volume(distancia: float) -> float:
-    proporcao = (distancia - DISTANCIA_MINIMA) / (DISTANCIA_MAXIMA - DISTANCIA_MINIMA)
+def converter_distancia_em_volume(
+    distancia: float, distancia_minima: float, distancia_maxima: float
+) -> float:
+    proporcao = (distancia - distancia_minima) / (distancia_maxima - distancia_minima)
     return limitar(proporcao, 0.0, 1.0)
 
 
-def suavizar_volume(atual: float, alvo: float, fator: float = SUAVIZACAO) -> float:
+def suavizar_volume(atual: float, alvo: float, fator: float) -> float:
     fator = limitar(fator, 0.0, 1.0)
     return limitar(atual + (alvo - atual) * fator, 0.0, 1.0)
 
@@ -48,7 +134,6 @@ def definir_volume(volume: float) -> None:
 
 
 def enfileirar_volume(fila: queue.Queue[float], volume: float) -> None:
-    """Substitui qualquer volume pendente pelo valor mais recente."""
     while True:
         try:
             fila.put_nowait(volume)
@@ -60,9 +145,7 @@ def enfileirar_volume(fila: queue.Queue[float], volume: float) -> None:
                 pass
 
 
-def _obter_volume_mais_recente(
-    fila: queue.Queue[float], primeiro: float
-) -> float:
+def _obter_volume_mais_recente(fila: queue.Queue[float], primeiro: float) -> float:
     volume = primeiro
     while True:
         try:
@@ -72,27 +155,25 @@ def _obter_volume_mais_recente(
 
 
 def processar_volumes(
-    fila: queue.Queue[float], encerrar: threading.Event
+    fila: queue.Queue[float],
+    encerrar: threading.Event,
+    intervalo: float,
+    mudanca_minima: float,
 ) -> None:
-    """Envia volumes ao wpctl sem bloquear a captura e a interface."""
     ultimo_volume = -1.0
     ultimo_comando = 0.0
-
     while not encerrar.is_set():
         try:
             volume = fila.get(timeout=0.05)
         except queue.Empty:
             continue
-
         volume = _obter_volume_mais_recente(fila, volume)
-        espera = INTERVALO_COMANDO - (time.monotonic() - ultimo_comando)
+        espera = intervalo - (time.monotonic() - ultimo_comando)
         if espera > 0 and encerrar.wait(espera):
             break
-
         volume = _obter_volume_mais_recente(fila, volume)
-        if abs(volume - ultimo_volume) < MUDANCA_MINIMA:
+        if abs(volume - ultimo_volume) < mudanca_minima:
             continue
-
         ultimo_comando = time.monotonic()
         try:
             definir_volume(volume)
@@ -102,27 +183,30 @@ def processar_volumes(
             ultimo_volume = volume
 
 
-def executar() -> None:
+def executar(configuracao: dict[str, dict[str, Any]]) -> None:
     import cv2
     import mediapipe as mp
 
+    camera_cfg = configuracao["camera"]
+    tracking_cfg = configuracao["tracking"]
+    volume_cfg = configuracao["volume"]
+    interface_visivel = configuracao["interface"]["visible"]
     camera = None
     encerrar_worker = threading.Event()
     fila_volumes: queue.Queue[float] = queue.Queue(maxsize=1)
     worker = threading.Thread(
         target=processar_volumes,
-        args=(fila_volumes, encerrar_worker),
+        args=(fila_volumes, encerrar_worker, volume_cfg["update_interval"], volume_cfg["minimum_change"]),
         name="wpctl-worker",
     )
     worker.start()
     try:
-        camera = cv2.VideoCapture(CAMERA_DEVICE, cv2.CAP_V4L2)
+        camera = cv2.VideoCapture(camera_cfg["device"], cv2.CAP_V4L2)
         if not camera.isOpened():
-            raise RuntimeError(f"Não foi possível abrir {CAMERA_DEVICE}.")
-
-        camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
-        camera.set(cv2.CAP_PROP_FPS, 30)
+            raise RuntimeError(f"Não foi possível abrir /dev/video{camera_cfg['device']}.")
+        camera.set(cv2.CAP_PROP_FRAME_WIDTH, camera_cfg["width"])
+        camera.set(cv2.CAP_PROP_FRAME_HEIGHT, camera_cfg["height"])
+        camera.set(cv2.CAP_PROP_FPS, camera_cfg["fps"])
         camera.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
         mp_maos = mp.solutions.hands
@@ -135,68 +219,70 @@ def executar() -> None:
             static_image_mode=False,
             max_num_hands=1,
             model_complexity=0,
-            min_detection_confidence=0.65,
-            min_tracking_confidence=0.65,
+            min_detection_confidence=tracking_cfg["detection_confidence"],
+            min_tracking_confidence=tracking_cfg["tracking_confidence"],
         ) as detector:
             while True:
                 sucesso, imagem = camera.read()
                 if not sucesso:
                     raise RuntimeError("Não foi possível ler a imagem da câmera.")
-
                 imagem = cv2.flip(imagem, 1)
-                if numero_frame % 2 == 0:
-                    ultimo_resultado = detector.process(
-                        cv2.cvtColor(imagem, cv2.COLOR_BGR2RGB)
-                    )
+                if numero_frame % tracking_cfg["process_every_n_frames"] == 0:
+                    ultimo_resultado = detector.process(cv2.cvtColor(imagem, cv2.COLOR_BGR2RGB))
                 numero_frame += 1
                 resultado = ultimo_resultado
                 altura, largura, _ = imagem.shape
 
                 if resultado and resultado.multi_hand_landmarks:
                     mao = resultado.multi_hand_landmarks[0]
-                    mp_desenho.draw_landmarks(imagem, mao, mp_maos.HAND_CONNECTIONS)
                     polegar, indicador = mao.landmark[4], mao.landmark[8]
                     px, py = int(polegar.x * largura), int(polegar.y * altura)
                     ix, iy = int(indicador.x * largura), int(indicador.y * altura)
-
-                    volume_alvo = converter_distancia_em_volume(math.hypot(ix - px, iy - py))
-                    volume_suave = suavizar_volume(volume_suave, volume_alvo)
-                    porcentagem = round(volume_suave * 100)
-                    cor = (0, 0, 255) if porcentagem < 15 else (0, 255, 0)
-
-                    cv2.circle(imagem, (px, py), 10, cor, -1)
-                    cv2.circle(imagem, (ix, iy), 10, cor, -1)
-                    cv2.line(imagem, (px, py), (ix, iy), cor, 3)
-                    topo = int(400 - volume_suave * 300)
-                    cv2.rectangle(imagem, (30, 100), (65, 400), (255, 255, 255), 2)
-                    cv2.rectangle(imagem, (30, topo), (65, 400), cor, -1)
-                    cv2.putText(imagem, f"{porcentagem}%", (20, 440), cv2.FONT_HERSHEY_SIMPLEX, 0.8, cor, 2)
-
+                    volume_alvo = converter_distancia_em_volume(
+                        math.hypot(ix - px, iy - py),
+                        volume_cfg["minimum_distance"],
+                        volume_cfg["maximum_distance"],
+                    )
+                    volume_suave = suavizar_volume(volume_suave, volume_alvo, volume_cfg["smoothing"])
                     enfileirar_volume(fila_volumes, volume_suave)
 
-                cv2.putText(
-                    imagem, "Polegar + indicador: volume | Q/Esc: sair", (20, 35),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2,
-                )
-                cv2.imshow("GestureDeck", imagem)
-                if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q"), 27):
-                    break
+                    if interface_visivel:
+                        mp_desenho.draw_landmarks(imagem, mao, mp_maos.HAND_CONNECTIONS)
+                        porcentagem = round(volume_suave * 100)
+                        cor = (0, 0, 255) if porcentagem < 15 else (0, 255, 0)
+                        cv2.circle(imagem, (px, py), 10, cor, -1)
+                        cv2.circle(imagem, (ix, iy), 10, cor, -1)
+                        cv2.line(imagem, (px, py), (ix, iy), cor, 3)
+                        topo = int(400 - volume_suave * 300)
+                        cv2.rectangle(imagem, (30, 100), (65, 400), (255, 255, 255), 2)
+                        cv2.rectangle(imagem, (30, topo), (65, 400), cor, -1)
+                        cv2.putText(imagem, f"{porcentagem}%", (20, 440), cv2.FONT_HERSHEY_SIMPLEX, 0.8, cor, 2)
+
+                if interface_visivel:
+                    cv2.putText(
+                        imagem, "Polegar + indicador: volume | Q/Esc: sair", (20, 35),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.65, (255, 255, 255), 2,
+                    )
+                    cv2.imshow("GestureDeck", imagem)
+                    if cv2.waitKey(1) & 0xFF in (ord("q"), ord("Q"), 27):
+                        break
     finally:
         encerrar_worker.set()
         try:
             if camera is not None:
                 camera.release()
-            cv2.destroyAllWindows()
+            if interface_visivel:
+                cv2.destroyAllWindows()
         finally:
             worker.join()
 
 
 def main() -> int:
     try:
-        executar()
+        executar(carregar_configuracao())
     except KeyboardInterrupt:
         print("\nEncerrado pelo usuário.")
-    except RuntimeError as erro:
+    except (ErroConfiguracao, RuntimeError) as erro:
         print(f"Erro: {erro}")
         return 1
     return 0

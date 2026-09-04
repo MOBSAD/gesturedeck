@@ -1,0 +1,20 @@
+[interface]
+visible = false
+
+[camera]
+device = 0
+width = 640
+height = 480
+fps = 30
+
+[tracking]
+process_every_n_frames = 2
+detection_confidence = 0.65
+tracking_confidence = 0.65
+
+[volume]
+minimum_distance = 25
+maximum_distance = 180
+smoothing = 0.18
+update_interval = 0.15
+minimum_change = 0.03

@@ -16,10 +16,10 @@ class TestLogicaDeVolume(unittest.TestCase):
         self.assertEqual(limitar(0.4, 0, 1), 0.4)
 
     def test_distancia_e_convertida_e_limitada(self):
-        self.assertEqual(converter_distancia_em_volume(25), 0)
-        self.assertEqual(converter_distancia_em_volume(180), 1)
-        self.assertEqual(converter_distancia_em_volume(0), 0)
-        self.assertEqual(converter_distancia_em_volume(500), 1)
+        self.assertEqual(converter_distancia_em_volume(25, 25, 180), 0)
+        self.assertEqual(converter_distancia_em_volume(180, 25, 180), 1)
+        self.assertEqual(converter_distancia_em_volume(0, 25, 180), 0)
+        self.assertEqual(converter_distancia_em_volume(500, 25, 180), 1)
 
     def test_suavizacao_aproxima_o_alvo(self):
         self.assertAlmostEqual(suavizar_volume(0.0, 1.0, 0.2), 0.2)
