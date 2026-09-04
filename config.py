@@ -36,8 +36,7 @@ CONFIGURACAO_PADRAO: dict[str, dict[str, Any]] = {
     },
     "gestures": {
         "pinch": "volume",
-        "fist": "",
-        "thumbs_up": "play_pause",
+        "four_fingers": "play_pause",
         "peace": "next_track",
         "three_fingers": "previous_track",
         "thumb_pinky": "mute",

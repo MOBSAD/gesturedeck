@@ -28,8 +28,7 @@ class TestConfiguracao(unittest.TestCase):
         self.assertEqual(config["camera"]["fps"], 24)
         self.assertTrue(config["activation"]["start_active"])
         self.assertEqual(config["gestures"], CONFIGURACAO_PADRAO["gestures"])
-        self.assertEqual(config["gestures"]["fist"], "")
-        self.assertEqual(config["gestures"]["thumbs_up"], "play_pause")
+        self.assertEqual(config["gestures"]["four_fingers"], "play_pause")
         self.assertEqual(config["gesture_detection"], CONFIGURACAO_PADRAO["gesture_detection"])
 
     def test_mapeamento_completo_e_acao_desativada(self):
@@ -37,7 +36,7 @@ class TestConfiguracao(unittest.TestCase):
             """
 [gestures]
 pinch = "volume"
-fist = "play_pause"
+four_fingers = "play_pause"
 peace = ""
 three_fingers = "previous_track"
 thumb_pinky = "mute"
@@ -57,9 +56,9 @@ mute = 2.0
     def test_configuracoes_invalidas(self):
         casos = (
             ("[gestures]\npeace = \"rm -rf\"\n", "gestures.peace"),
-            ("[gestures]\nfist = 1\n", "gestures.fist"),
+            ("[gestures]\nfour_fingers = 1\n", "gestures.four_fingers"),
             ("[gestures]\npinch = \"mute\"\n", "gestures.pinch"),
-            ("[gestures]\nfist = \"volume\"\n", "gestures.fist"),
+            ("[gestures]\nfour_fingers = \"volume\"\n", "gestures.four_fingers"),
             ("[gesture_detection]\nstability_seconds = -1\n", "gesture_detection.stability_seconds"),
             ("[gesture_cooldowns]\nmute = -0.1\n", "gesture_cooldowns.mute"),
             ("[tracking]\ncontrol_hand = \"both\"\n", "tracking.control_hand"),

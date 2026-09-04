@@ -7,8 +7,7 @@ GestureDeck é um motor configurável de gestos para Linux. Ele usa OpenCV e Med
 | Gesto | Padrão | Ação |
 | --- | --- | --- |
 | Pinça (`pinch`) | Polegar e indicador próximos | Volume contínuo |
-| Punho (`fist`) | Cinco dedos fechados | Desativado por padrão |
-| Polegar para cima (`thumbs_up`) | Somente polegar estendido e afastado do indicador | Play/pause |
+| Quatro dedos (`four_fingers`) | Indicador, médio, anelar e mínimo estendidos; polegar dobrado | Play/pause |
 | Paz (`peace`) | Indicador e médio estendidos; anelar e mínimo dobrados | Próxima faixa |
 | Três dedos (`three_fingers`) | Indicador, médio e anelar estendidos; mínimo dobrado | Faixa anterior |
 | Polegar e mínimo (`thumb_pinky`) | Somente polegar e mínimo estendidos | Alternar mute |
@@ -98,8 +97,7 @@ beep = true
 
 [gestures]
 pinch = "volume"
-fist = ""
-thumbs_up = "play_pause"
+four_fingers = "play_pause"
 peace = "next_track"
 three_fingers = "previous_track"
 thumb_pinky = "mute"

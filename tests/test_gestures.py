@@ -30,8 +30,7 @@ class TestClassificacao(unittest.TestCase):
     def test_classifica_todos_os_gestos(self):
         casos = {
             "open_palm": (True, True, True, True, True),
-            "fist": (False, False, False, False, False),
-            "thumbs_up": (True, False, False, False, False),
+            "four_fingers": (False, True, True, True, True),
             "peace": (False, True, True, False, False),
             "three_fingers": (False, True, True, True, False),
             "thumb_pinky": (True, False, False, False, True),
@@ -69,32 +68,34 @@ class TestClassificacao(unittest.TestCase):
         mao.landmark[4].x = -10
         self.assertIsNone(classificar_gesto(mao))
 
-    def test_fechar_pinca_nao_executa_play_pause(self):
-        mao = criar_mao((True, False, False, False, False))
-        mao.landmark[8] = ponto(mao.landmark[4].x, mao.landmark[4].y)
-        gesto = classificar_gesto(mao)
-        motor = MotorGestos(
-            {"fist": "", "thumbs_up": "play_pause"}, 0.35, 0.25, 1.0, {}
-        )
-
-        self.assertEqual(gesto, "fist")
-        self.assertIsNone(motor.atualizar(gesto, True, 0.0).acao)
-        self.assertIsNone(motor.atualizar(gesto, True, 0.5).acao)
-
-    def test_thumbs_up_usa_estabilidade_e_liberacao(self):
-        motor = MotorGestos(
-            {"thumbs_up": "play_pause"}, 0.35, 0.25, 1.0, {}
-        )
-        self.assertIsNone(motor.atualizar("thumbs_up", True, 0.0).acao)
+    def test_pinca_quatro_dedos_e_palma_nao_conflitam(self):
         self.assertEqual(
-            motor.atualizar("thumbs_up", True, 0.35).acao, "play_pause"
+            classificar_gesto(criar_mao((True, True, False, False, False))),
+            "pinch",
         )
-        self.assertIsNone(motor.atualizar("thumbs_up", True, 2.0).acao)
+        self.assertEqual(
+            classificar_gesto(criar_mao((False, True, True, True, True))),
+            "four_fingers",
+        )
+        self.assertEqual(
+            classificar_gesto(criar_mao((True, True, True, True, True))),
+            "open_palm",
+        )
+
+    def test_four_fingers_usa_estabilidade_e_liberacao(self):
+        motor = MotorGestos(
+            {"four_fingers": "play_pause"}, 0.35, 0.25, 1.0, {}
+        )
+        self.assertIsNone(motor.atualizar("four_fingers", True, 0.0).acao)
+        self.assertEqual(
+            motor.atualizar("four_fingers", True, 0.35).acao, "play_pause"
+        )
+        self.assertIsNone(motor.atualizar("four_fingers", True, 2.0).acao)
         motor.atualizar(None, True, 2.1)
         motor.atualizar(None, True, 2.4)
-        motor.atualizar("thumbs_up", True, 2.5)
+        motor.atualizar("four_fingers", True, 2.5)
         self.assertEqual(
-            motor.atualizar("thumbs_up", True, 2.9).acao, "play_pause"
+            motor.atualizar("four_fingers", True, 2.9).acao, "play_pause"
         )
 
     def test_classificacao_nao_depende_de_mao_esquerda_ou_direita(self):
@@ -122,7 +123,7 @@ class TestClassificacao(unittest.TestCase):
 class TestMotorTemporal(unittest.TestCase):
     def setUp(self):
         self.motor = MotorGestos(
-            {"fist": "play_pause", "peace": "next_track"},
+            {"four_fingers": "play_pause", "peace": "next_track"},
             estabilidade=0.35,
             liberacao=0.25,
             cooldown_padrao=1.0,
@@ -130,10 +131,10 @@ class TestMotorTemporal(unittest.TestCase):
         )
 
     def test_estabilidade_e_disparo_unico(self):
-        self.assertIsNone(self.motor.atualizar("fist", True, 0.0).acao)
-        self.assertLess(self.motor.atualizar("fist", True, 0.2).progresso, 1)
-        self.assertEqual(self.motor.atualizar("fist", True, 0.35).acao, "play_pause")
-        self.assertIsNone(self.motor.atualizar("fist", True, 1.0).acao)
+        self.assertIsNone(self.motor.atualizar("four_fingers", True, 0.0).acao)
+        self.assertLess(self.motor.atualizar("four_fingers", True, 0.2).progresso, 1)
+        self.assertEqual(self.motor.atualizar("four_fingers", True, 0.35).acao, "play_pause")
+        self.assertIsNone(self.motor.atualizar("four_fingers", True, 1.0).acao)
 
     def test_perda_curta_nao_reinicia_estabilidade(self):
         motor = MotorGestos(
@@ -145,17 +146,17 @@ class TestMotorTemporal(unittest.TestCase):
         self.assertEqual(motor.atualizar("peace", True, 0.55).acao, "next_track")
 
     def test_exige_liberacao_e_respeita_cooldown(self):
-        self.motor.atualizar("fist", True, 0.0)
-        self.motor.atualizar("fist", True, 0.4)
+        self.motor.atualizar("four_fingers", True, 0.0)
+        self.motor.atualizar("four_fingers", True, 0.4)
         self.motor.atualizar(None, True, 0.5)
         self.motor.atualizar(None, True, 0.8)
-        self.motor.atualizar("fist", True, 0.9)
-        self.assertIsNone(self.motor.atualizar("fist", True, 1.3).acao)
-        self.assertEqual(self.motor.atualizar("fist", True, 2.4).acao, "play_pause")
+        self.motor.atualizar("four_fingers", True, 0.9)
+        self.assertIsNone(self.motor.atualizar("four_fingers", True, 1.3).acao)
+        self.assertEqual(self.motor.atualizar("four_fingers", True, 2.4).acao, "play_pause")
 
     def test_bloqueia_acoes_inativo_e_prioriza_palma(self):
         ativacao = ControleAtivacao(True, espera=0.5, cooldown=1.0, iniciar_ativo=False)
-        _, estado = processar_estado_gesto("fist", 0.0, ativacao, self.motor)
+        _, estado = processar_estado_gesto("four_fingers", 0.0, ativacao, self.motor)
         self.assertIsNone(estado.acao)
         alternou, estado = processar_estado_gesto("open_palm", 0.1, ativacao, self.motor)
         self.assertFalse(alternou)

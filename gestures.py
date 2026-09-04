@@ -7,11 +7,7 @@ import math
 from typing import Any
 
 
-GESTOS_DISCRETOS = {"fist", "peace", "three_fingers", "thumb_pinky", "thumbs_up"}
-
-
-def distancia(a: Any, b: Any) -> float:
-    return math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2 + (a.z - b.z) ** 2)
+GESTOS_DISCRETOS = {"peace", "three_fingers", "thumb_pinky", "four_fingers"}
 
 
 def _angulo(a: Any, centro: Any, b: Any) -> float:
@@ -46,13 +42,8 @@ def classificar_gesto(mao: Any) -> str | None:
         return "peace"
     if polegar and not indicador and not medio and not anelar and minimo:
         return "thumb_pinky"
-    separacao_polegar = distancia(mao.landmark[4], mao.landmark[8]) / max(
-        distancia(mao.landmark[0], mao.landmark[9]), 1e-6
-    )
-    if polegar and not indicador and not medio and not anelar and not minimo and separacao_polegar > 0.7:
-        return "thumbs_up"
-    if not indicador and not medio and not anelar and not minimo:
-        return "fist"
+    if not polegar and indicador and medio and anelar and minimo:
+        return "four_fingers"
     if indicador and not medio and not anelar and not minimo:
         return "pinch"
     return None
