@@ -11,6 +11,7 @@ fps = 30
 process_every_n_frames = 2
 detection_confidence = 0.65
 tracking_confidence = 0.65
+control_hand = "any"
 
 [volume]
 minimum_distance = 25

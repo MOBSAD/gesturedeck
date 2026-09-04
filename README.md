@@ -44,6 +44,7 @@ Edite `config.toml` antes de executar. Opções ausentes usam os valores padrão
 | `tracking.process_every_n_frames` | `2` | Processa a mão a cada N quadros. |
 | `tracking.detection_confidence` | `0.65` | Confiança mínima de detecção, entre 0 e 1. |
 | `tracking.tracking_confidence` | `0.65` | Confiança mínima de rastreamento, entre 0 e 1. |
+| `tracking.control_hand` | `"any"` | Mão controladora: `"left"`, `"right"` ou qualquer mão com `"any"`. |
 | `volume.minimum_distance` / `maximum_distance` | `25` / `180` | Distâncias dos dedos para volume mínimo e máximo. |
 | `volume.smoothing` | `0.18` | Fator de suavização, entre 0 e 1. |
 | `volume.update_interval` | `0.15` | Intervalo mínimo entre comandos, em segundos. |

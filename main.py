@@ -20,6 +20,7 @@ CONFIGURACAO_PADRAO: dict[str, dict[str, Any]] = {
         "process_every_n_frames": 2,
         "detection_confidence": 0.65,
         "tracking_confidence": 0.65,
+        "control_hand": "any",
     },
     "volume": {
         "minimum_distance": 25.0,
@@ -88,6 +89,11 @@ def carregar_configuracao(caminho: str | Path = "config.toml") -> dict[str, dict
     )
     for opcao in ("detection_confidence", "tracking_confidence"):
         _validar_numero(configuracao["tracking"][opcao], f"tracking.{opcao}", 0.0, 1.0)
+    mao_controle = configuracao["tracking"]["control_hand"]
+    if not isinstance(mao_controle, str) or mao_controle not in {"left", "right", "any"}:
+        raise ErroConfiguracao(
+            "'tracking.control_hand' deve ser 'left', 'right' ou 'any'."
+        )
 
     for opcao in ("minimum_distance", "maximum_distance", "update_interval", "minimum_change"):
         _validar_numero(configuracao["volume"][opcao], f"volume.{opcao}")
@@ -114,6 +120,20 @@ def converter_distancia_em_volume(
 def suavizar_volume(atual: float, alvo: float, fator: float) -> float:
     fator = limitar(fator, 0.0, 1.0)
     return limitar(atual + (alvo - atual) * fator, 0.0, 1.0)
+
+
+def selecionar_mao(resultado: Any, mao_controle: str) -> Any | None:
+    """Retorna a primeira mão que corresponde à lateralidade configurada."""
+    maos = getattr(resultado, "multi_hand_landmarks", None) or []
+    if mao_controle == "any":
+        return maos[0] if maos else None
+
+    lateralidades = getattr(resultado, "multi_handedness", None) or []
+    for mao, lateralidade in zip(maos, lateralidades):
+        classificacoes = getattr(lateralidade, "classification", None) or []
+        if classificacoes and classificacoes[0].label.lower() == mao_controle:
+            return mao
+    return None
 
 
 def definir_volume(volume: float) -> None:
@@ -217,7 +237,7 @@ def executar(configuracao: dict[str, dict[str, Any]]) -> None:
 
         with mp_maos.Hands(
             static_image_mode=False,
-            max_num_hands=1,
+            max_num_hands=2,
             model_complexity=0,
             min_detection_confidence=tracking_cfg["detection_confidence"],
             min_tracking_confidence=tracking_cfg["tracking_confidence"],
@@ -233,8 +253,8 @@ def executar(configuracao: dict[str, dict[str, Any]]) -> None:
                 resultado = ultimo_resultado
                 altura, largura, _ = imagem.shape
 
-                if resultado and resultado.multi_hand_landmarks:
-                    mao = resultado.multi_hand_landmarks[0]
+                mao = selecionar_mao(resultado, tracking_cfg["control_hand"])
+                if mao is not None:
                     polegar, indicador = mao.landmark[4], mao.landmark[8]
                     px, py = int(polegar.x * largura), int(polegar.y * altura)
                     ix, iy = int(indicador.x * largura), int(indicador.y * altura)

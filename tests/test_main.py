@@ -1,10 +1,12 @@
 import unittest
 from queue import Queue
+from types import SimpleNamespace
 
 from main import (
     converter_distancia_em_volume,
     enfileirar_volume,
     limitar,
+    selecionar_mao,
     suavizar_volume,
 )
 
@@ -33,6 +35,30 @@ class TestLogicaDeVolume(unittest.TestCase):
 
         self.assertEqual(fila.qsize(), 1)
         self.assertEqual(fila.get_nowait(), 0.8)
+
+    def test_seleciona_mao_pela_lateralidade(self):
+        esquerda, direita = object(), object()
+        resultado = SimpleNamespace(
+            multi_hand_landmarks=[esquerda, direita],
+            multi_handedness=[
+                SimpleNamespace(classification=[SimpleNamespace(label="Left")]),
+                SimpleNamespace(classification=[SimpleNamespace(label="Right")]),
+            ],
+        )
+
+        self.assertIs(selecionar_mao(resultado, "any"), esquerda)
+        self.assertIs(selecionar_mao(resultado, "left"), esquerda)
+        self.assertIs(selecionar_mao(resultado, "right"), direita)
+
+    def test_ignora_mao_de_lateralidade_diferente(self):
+        resultado = SimpleNamespace(
+            multi_hand_landmarks=[object()],
+            multi_handedness=[
+                SimpleNamespace(classification=[SimpleNamespace(label="Left")])
+            ],
+        )
+
+        self.assertIsNone(selecionar_mao(resultado, "right"))
 
 
 if __name__ == "__main__":

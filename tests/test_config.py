@@ -27,6 +27,7 @@ fps = 24
 process_every_n_frames = 3
 detection_confidence = 0.7
 tracking_confidence = 0.8
+control_hand = "right"
 [volume]
 minimum_distance = 20
 maximum_distance = 200
@@ -40,6 +41,7 @@ minimum_change = 0.05
         self.assertFalse(config["interface"]["visible"])
         self.assertEqual(config["camera"]["device"], 2)
         self.assertEqual(config["tracking"]["process_every_n_frames"], 3)
+        self.assertEqual(config["tracking"]["control_hand"], "right")
         self.assertEqual(config["volume"]["maximum_distance"], 200)
 
     def test_configuracao_parcial_mantem_valores_padrao(self):
@@ -49,6 +51,7 @@ minimum_change = 0.05
 
         self.assertEqual(config["camera"]["fps"], 25)
         self.assertEqual(config["camera"]["width"], 640)
+        self.assertEqual(config["tracking"]["control_hand"], "any")
         self.assertEqual(config["volume"], CONFIGURACAO_PADRAO["volume"])
 
     def test_arquivo_inexistente_usa_todos_os_padrao(self):
@@ -62,6 +65,7 @@ minimum_change = 0.05
         casos = (
             ("[interface]\nvisible = 1\n", "interface.visible"),
             ("[camera]\nfps = 0\n", "camera.fps"),
+            ("[tracking]\ncontrol_hand = \"both\"\n", "tracking.control_hand"),
             ("[volume]\nminimum_distance = 200\nmaximum_distance = 100\n", "volume.maximum_distance"),
         )
         for conteudo, opcao in casos:
