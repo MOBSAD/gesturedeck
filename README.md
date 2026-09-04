@@ -1,6 +1,6 @@
 # GestureDeck
 
-GestureDeck é um aplicativo simples para Linux que usa a webcam para controlar o volume do sistema. O MediaPipe detecta uma mão e a distância entre as pontas do polegar e do indicador define o volume. As mudanças são suavizadas antes de serem enviadas ao PipeWire com `wpctl`.
+GestureDeck é um aplicativo simples para Linux que usa a webcam para controlar o volume do sistema. O MediaPipe detecta até duas mãos, seleciona a lateralidade configurada e usa a distância entre as pontas do polegar e do indicador para definir o volume. As mudanças são suavizadas antes de serem enviadas ao PipeWire com `wpctl`.
 
 ## Requisitos
 
@@ -52,6 +52,8 @@ Edite `config.toml` antes de executar. Opções ausentes usam os valores padrão
 
 Com `interface.visible = false`, nenhuma janela é criada; encerre o programa com `Ctrl+C`.
 
+Os valores `"left"` e `"right"` seguem a classificação de lateralidade retornada pelo MediaPipe. Quando as duas mãos aparecem, somente a mão configurada controla o volume.
+
 ## Testes
 
 ```bash
@@ -60,7 +62,7 @@ uv run python -m unittest discover -s tests -v
 
 ## Problemas comuns
 
-- **A câmera não abre:** confira se `/dev/video0` existe, se seu usuário tem permissão e se outro programa não está usando a webcam.
+- **A câmera não abre:** confira se o dispositivo indicado em `camera.device` existe, se seu usuário tem permissão e se outro programa não está usando a webcam.
 - **O volume não muda:** execute `wpctl status` para confirmar que PipeWire/WirePlumber está ativo e que existe uma saída de áudio padrão.
 - **A janela não aparece:** confirme que há uma sessão gráfica ativa.
 - **A mão não é detectada:** use boa iluminação e mantenha a mão inteira visível.
