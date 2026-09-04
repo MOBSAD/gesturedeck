@@ -1,6 +1,12 @@
 import unittest
+from queue import Queue
 
-from main import converter_distancia_em_volume, limitar, suavizar_volume
+from main import (
+    converter_distancia_em_volume,
+    enfileirar_volume,
+    limitar,
+    suavizar_volume,
+)
 
 
 class TestLogicaDeVolume(unittest.TestCase):
@@ -19,6 +25,14 @@ class TestLogicaDeVolume(unittest.TestCase):
         self.assertAlmostEqual(suavizar_volume(0.0, 1.0, 0.2), 0.2)
         self.assertAlmostEqual(suavizar_volume(1.0, 0.0, 0.2), 0.8)
         self.assertEqual(suavizar_volume(0.3, 1.0, 0.0), 0.3)
+
+    def test_fila_preserva_apenas_volume_mais_recente(self):
+        fila = Queue(maxsize=1)
+        enfileirar_volume(fila, 0.2)
+        enfileirar_volume(fila, 0.8)
+
+        self.assertEqual(fila.qsize(), 1)
+        self.assertEqual(fila.get_nowait(), 0.8)
 
 
 if __name__ == "__main__":
