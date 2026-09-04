@@ -5,6 +5,7 @@ GestureDeck é um aplicativo simples para Linux que usa a webcam para controlar 
 ## Requisitos
 
 - Linux com PipeWire e o comando `wpctl` disponível
+- `pw-play` para os avisos sonoros (opcional; o controle funciona sem ele)
 - webcam acessível no dispositivo definido em `config.toml` (por padrão, `/dev/video0`)
 - Python 3.12
 - [`uv`](https://docs.astral.sh/uv/)
@@ -26,6 +27,7 @@ uv run python main.py
 
 - aproxime o polegar e o indicador para diminuir o volume;
 - afaste os dedos para aumentar o volume;
+- mantenha a palma aberta por 0,8 segundo para ativar ou desativar o controle;
 - pressione `Q` ou `Esc` na janela da câmera para sair;
 - pressione `Ctrl+C` no terminal para encerrar.
 
@@ -49,10 +51,17 @@ Edite `config.toml` antes de executar. Opções ausentes usam os valores padrão
 | `volume.smoothing` | `0.18` | Fator de suavização, entre 0 e 1. |
 | `volume.update_interval` | `0.15` | Intervalo mínimo entre comandos, em segundos. |
 | `volume.minimum_change` | `0.03` | Mudança mínima de volume, entre 0 e 1. |
+| `activation.enabled` | `true` | Habilita a alternância por palma aberta. |
+| `activation.hold_seconds` | `0.8` | Tempo durante o qual a palma deve permanecer aberta. |
+| `activation.cooldown` | `1.5` | Intervalo mínimo entre alternâncias, em segundos. |
+| `activation.start_active` | `false` | Inicia o controle de volume ativo. |
+| `activation.beep` | `true` | Toca aviso agudo ao ativar e grave ao desativar. |
 
 Com `interface.visible = false`, nenhuma janela é criada; encerre o programa com `Ctrl+C`.
 
 Os valores `"left"` e `"right"` seguem a classificação de lateralidade retornada pelo MediaPipe. Quando as duas mãos aparecem, somente a mão configurada controla o volume.
+
+Somente a mão selecionada por `tracking.control_hand` pode alternar o estado. Após uma alternância, feche ou retire a mão antes de usar a palma aberta novamente. Enquanto estiver `INATIVO`, nenhum gesto altera o volume.
 
 ## Testes
 
@@ -64,6 +73,7 @@ uv run python -m unittest discover -s tests -v
 
 - **A câmera não abre:** confira se o dispositivo indicado em `camera.device` existe, se seu usuário tem permissão e se outro programa não está usando a webcam.
 - **O volume não muda:** execute `wpctl status` para confirmar que PipeWire/WirePlumber está ativo e que existe uma saída de áudio padrão.
+- **O aviso sonoro não toca:** confirme que `pw-play` está disponível. Sem ele, o GestureDeck mostra um aviso e continua normalmente sem som.
 - **A janela não aparece:** confirme que há uma sessão gráfica ativa.
 - **A mão não é detectada:** use boa iluminação e mantenha a mão inteira visível.
 

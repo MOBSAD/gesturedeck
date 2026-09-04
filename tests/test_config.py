@@ -34,6 +34,12 @@ maximum_distance = 200
 smoothing = 0.25
 update_interval = 0.2
 minimum_change = 0.05
+[activation]
+enabled = true
+hold_seconds = 1.0
+cooldown = 2.0
+start_active = true
+beep = false
 """,
             )
             config = carregar_configuracao(caminho)
@@ -43,6 +49,8 @@ minimum_change = 0.05
         self.assertEqual(config["tracking"]["process_every_n_frames"], 3)
         self.assertEqual(config["tracking"]["control_hand"], "right")
         self.assertEqual(config["volume"]["maximum_distance"], 200)
+        self.assertTrue(config["activation"]["start_active"])
+        self.assertFalse(config["activation"]["beep"])
 
     def test_configuracao_parcial_mantem_valores_padrao(self):
         with tempfile.TemporaryDirectory() as pasta:
@@ -53,6 +61,7 @@ minimum_change = 0.05
         self.assertEqual(config["camera"]["width"], 640)
         self.assertEqual(config["tracking"]["control_hand"], "any")
         self.assertEqual(config["volume"], CONFIGURACAO_PADRAO["volume"])
+        self.assertEqual(config["activation"], CONFIGURACAO_PADRAO["activation"])
 
     def test_arquivo_inexistente_usa_todos_os_padrao(self):
         with tempfile.TemporaryDirectory() as pasta:
@@ -66,6 +75,8 @@ minimum_change = 0.05
             ("[interface]\nvisible = 1\n", "interface.visible"),
             ("[camera]\nfps = 0\n", "camera.fps"),
             ("[tracking]\ncontrol_hand = \"both\"\n", "tracking.control_hand"),
+            ("[activation]\nenabled = \"yes\"\n", "activation.enabled"),
+            ("[activation]\nhold_seconds = -1\n", "activation.hold_seconds"),
             ("[volume]\nminimum_distance = 200\nmaximum_distance = 100\n", "volume.maximum_distance"),
         )
         for conteudo, opcao in casos:

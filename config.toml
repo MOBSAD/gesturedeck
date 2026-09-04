@@ -1,14 +1,14 @@
 [interface]
-visible = false
+visible = true
 
 [camera]
 device = 0
-width = 640
+width = 600
 height = 480
-fps = 30
+fps = 24
 
 [tracking]
-process_every_n_frames = 2
+process_every_n_frames = 1
 detection_confidence = 0.65
 tracking_confidence = 0.65
 control_hand = "any"
@@ -18,4 +18,11 @@ minimum_distance = 25
 maximum_distance = 180
 smoothing = 0.18
 update_interval = 0.15
-minimum_change = 0.03
+minimum_change = 0.1
+
+[activation]
+enabled = true
+hold_seconds = 0.8
+cooldown = 1.5
+start_active = false
+beep = true

@@ -3,9 +3,11 @@ from queue import Queue
 from types import SimpleNamespace
 
 from main import (
+    ControleAtivacao,
     converter_distancia_em_volume,
     enfileirar_volume,
     limitar,
+    palma_aberta,
     selecionar_mao,
     suavizar_volume,
 )
@@ -59,6 +61,36 @@ class TestLogicaDeVolume(unittest.TestCase):
         )
 
         self.assertIsNone(selecionar_mao(resultado, "right"))
+
+    def test_detecta_palma_aberta(self):
+        landmarks = [SimpleNamespace(x=0.0, y=0.0, z=0.0) for _ in range(21)]
+        for articulacao in (3, 6, 10, 14, 18):
+            landmarks[articulacao] = SimpleNamespace(x=0.2, y=0.0, z=0.0)
+        for ponta in (4, 8, 12, 16, 20):
+            landmarks[ponta] = SimpleNamespace(x=0.4, y=0.0, z=0.0)
+        mao = SimpleNamespace(landmark=landmarks)
+
+        self.assertTrue(palma_aberta(mao))
+        landmarks[8] = SimpleNamespace(x=0.1, y=0.0, z=0.0)
+        self.assertFalse(palma_aberta(mao))
+
+    def test_ativacao_exige_tempo_liberacao_e_cooldown(self):
+        controle = ControleAtivacao(True, espera=0.8, cooldown=1.5, iniciar_ativo=False)
+
+        self.assertFalse(controle.atualizar(True, 0.0))
+        self.assertTrue(controle.atualizar(True, 0.8))
+        self.assertTrue(controle.ativo)
+        self.assertFalse(controle.atualizar(True, 2.5))
+        controle.atualizar(False, 2.6)
+        controle.atualizar(True, 2.7)
+        self.assertTrue(controle.atualizar(True, 3.6))
+        self.assertFalse(controle.ativo)
+
+    def test_ativacao_desabilitada_mantem_controle_ativo(self):
+        controle = ControleAtivacao(False, 0.8, 1.5, iniciar_ativo=False)
+
+        self.assertTrue(controle.ativo)
+        self.assertFalse(controle.atualizar(True, 10.0))
 
 
 if __name__ == "__main__":
