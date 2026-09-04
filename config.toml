@@ -5,17 +5,17 @@ visible = true
 device = 0
 width = 600
 height = 480
-fps = 24
+fps = 30
 
 [tracking]
-process_every_n_frames = 1
+process_every_n_frames = 2
 detection_confidence = 0.65
 tracking_confidence = 0.65
-control_hand = "any"
+control_hand = "right"
 
 [volume]
 minimum_distance = 25
-maximum_distance = 180
+maximum_distance = 50
 smoothing = 0.18
 update_interval = 0.15
 minimum_change = 0.1
@@ -29,7 +29,8 @@ beep = true
 
 [gestures]
 pinch = "volume"
-fist = "play_pause"
+fist = ""
+thumbs_up = "play_pause"
 peace = "next_track"
 three_fingers = "previous_track"
 thumb_pinky = "mute"
@@ -53,3 +54,9 @@ display_seconds = 1.5
 [performance]
 camera_buffer = 1
 config_reload_seconds = 1.0
+
+[privacy]
+blur_face = true
+blur_strength = 59
+blur_padding = 0.05
+detect_every_n_frames = 2

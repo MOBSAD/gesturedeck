@@ -31,6 +31,7 @@ class TestClassificacao(unittest.TestCase):
         casos = {
             "open_palm": (True, True, True, True, True),
             "fist": (False, False, False, False, False),
+            "thumbs_up": (True, False, False, False, False),
             "peace": (False, True, True, False, False),
             "three_fingers": (False, True, True, True, False),
             "thumb_pinky": (True, False, False, False, True),
@@ -51,10 +52,50 @@ class TestClassificacao(unittest.TestCase):
             "three_fingers",
         )
 
+    def test_paz_e_tres_dedos_aceitam_polegar_em_qualquer_estado(self):
+        for polegar in (False, True):
+            with self.subTest(polegar=polegar):
+                self.assertEqual(
+                    classificar_gesto(criar_mao((polegar, True, True, False, False))),
+                    "peace",
+                )
+                self.assertEqual(
+                    classificar_gesto(criar_mao((polegar, True, True, True, False))),
+                    "three_fingers",
+                )
+
     def test_afastar_polegar_e_indicador_nao_basta_para_pinca(self):
         mao = criar_mao((True, True, False, True, False))
         mao.landmark[4].x = -10
         self.assertIsNone(classificar_gesto(mao))
+
+    def test_fechar_pinca_nao_executa_play_pause(self):
+        mao = criar_mao((True, False, False, False, False))
+        mao.landmark[8] = ponto(mao.landmark[4].x, mao.landmark[4].y)
+        gesto = classificar_gesto(mao)
+        motor = MotorGestos(
+            {"fist": "", "thumbs_up": "play_pause"}, 0.35, 0.25, 1.0, {}
+        )
+
+        self.assertEqual(gesto, "fist")
+        self.assertIsNone(motor.atualizar(gesto, True, 0.0).acao)
+        self.assertIsNone(motor.atualizar(gesto, True, 0.5).acao)
+
+    def test_thumbs_up_usa_estabilidade_e_liberacao(self):
+        motor = MotorGestos(
+            {"thumbs_up": "play_pause"}, 0.35, 0.25, 1.0, {}
+        )
+        self.assertIsNone(motor.atualizar("thumbs_up", True, 0.0).acao)
+        self.assertEqual(
+            motor.atualizar("thumbs_up", True, 0.35).acao, "play_pause"
+        )
+        self.assertIsNone(motor.atualizar("thumbs_up", True, 2.0).acao)
+        motor.atualizar(None, True, 2.1)
+        motor.atualizar(None, True, 2.4)
+        motor.atualizar("thumbs_up", True, 2.5)
+        self.assertEqual(
+            motor.atualizar("thumbs_up", True, 2.9).acao, "play_pause"
+        )
 
     def test_classificacao_nao_depende_de_mao_esquerda_ou_direita(self):
         esquerda = criar_mao((False, True, True, False, False))

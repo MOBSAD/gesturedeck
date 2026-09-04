@@ -42,6 +42,23 @@ def suavizar_volume(atual: float, alvo: float, fator: float) -> float:
     return limitar(atual + (alvo - atual) * limitar(fator, 0.0, 1.0), 0.0, 1.0)
 
 
+def borrar_rosto(
+    cv2: Any, imagem: Any, rostos: Any, intensidade: int, margem: float
+) -> None:
+    """Desfoca somente as regiões faciais detectadas."""
+    altura_imagem, largura_imagem = imagem.shape[:2]
+    for x, y, largura, altura in rostos:
+        margem_x, margem_y = int(largura * margem), int(altura * margem)
+        inicio_x, inicio_y = max(0, x - margem_x), max(0, y - margem_y)
+        fim_x = min(largura_imagem, x + largura + margem_x)
+        fim_y = min(altura_imagem, y + altura + margem_y)
+        regiao = imagem[inicio_y:fim_y, inicio_x:fim_x]
+        if regiao.size:
+            imagem[inicio_y:fim_y, inicio_x:fim_x] = cv2.GaussianBlur(
+                regiao, (intensidade, intensidade), 0
+            )
+
+
 def _desenhar_interface(
     cv2: Any,
     imagem: Any,
@@ -95,6 +112,7 @@ def executar(
     activation_cfg = configuracao["activation"]
     detection_cfg = configuracao["gesture_detection"]
     feedback_cfg = configuracao["feedback"]
+    privacy_cfg = configuracao["privacy"]
     interface_visivel = configuracao["interface"]["visible"] and not forcar_headless
 
     ativacao = ControleAtivacao(
@@ -127,6 +145,9 @@ def executar(
     inicio_fps = time.monotonic()
     frames_fps = 0
     fps_real = 0.0
+    detector_rosto = None
+    rostos = []
+    aviso_detector_rosto = False
     try:
         camera = cv2.VideoCapture(camera_cfg["device"], cv2.CAP_V4L2)
         if not camera.isOpened():
@@ -177,6 +198,7 @@ def executar(
                     activation_cfg = configuracao["activation"]
                     detection_cfg = configuracao["gesture_detection"]
                     feedback_cfg = configuracao["feedback"]
+                    privacy_cfg = configuracao["privacy"]
                     interface_visivel = configuracao["interface"]["visible"] and not forcar_headless
                     if activation_cfg != activation_anterior:
                         ativo_anterior = ativacao.ativo
@@ -244,6 +266,8 @@ def executar(
                     acao_exibida = resultado.acao
                     sucesso_acao = resultado.sucesso
                     feedback_ate = agora + feedback_cfg["display_seconds"]
+                    if not resultado.sucesso:
+                        print(f"Erro em {resultado.acao}: {resultado.mensagem}")
                 if agora >= feedback_ate:
                     confirmado = None
                     acao_exibida = None
@@ -252,6 +276,28 @@ def executar(
                     aviso = None
 
                 if interface_visivel:
+                    if privacy_cfg["blur_face"]:
+                        if detector_rosto is None and not aviso_detector_rosto:
+                            detector_rosto = cv2.CascadeClassifier(
+                                cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+                            )
+                            if detector_rosto.empty():
+                                print("Aviso: detector facial do OpenCV não pôde ser carregado.")
+                                detector_rosto = None
+                                aviso_detector_rosto = True
+                        if detector_rosto is not None:
+                            if numero_frame % privacy_cfg["detect_every_n_frames"] == 0:
+                                cinza = cv2.cvtColor(imagem, cv2.COLOR_BGR2GRAY)
+                                rostos = detector_rosto.detectMultiScale(
+                                    cinza, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60)
+                                )
+                            borrar_rosto(
+                                cv2,
+                                imagem,
+                                rostos,
+                                privacy_cfg["blur_strength"],
+                                privacy_cfg["blur_padding"],
+                            )
                     if mao is not None:
                         mp_desenho.draw_landmarks(imagem, mao, mp_maos.HAND_CONNECTIONS)
                     progresso = estado.progresso

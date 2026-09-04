@@ -38,6 +38,14 @@ class TestExecutorAcoes(unittest.TestCase):
         for acao in ("play_pause", "next_track", "previous_track", "mute"):
             self.assertTrue(executor.executar(Comando(acao)).sucesso)
         self.assertEqual(executar.call_args_list[0].args[0], ["playerctl", "play-pause"])
+        self.assertEqual(
+            executar.call_args_list[1].args[0],
+            ["playerctl", "--all-players", "next"],
+        )
+        self.assertEqual(
+            executar.call_args_list[2].args[0],
+            ["playerctl", "--all-players", "previous"],
+        )
         self.assertNotIn("shell", executar.call_args_list[0].kwargs)
 
     def test_volume_usa_wpctl_com_valor_limitado_pelo_motor(self):

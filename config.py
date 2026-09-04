@@ -36,7 +36,8 @@ CONFIGURACAO_PADRAO: dict[str, dict[str, Any]] = {
     },
     "gestures": {
         "pinch": "volume",
-        "fist": "play_pause",
+        "fist": "",
+        "thumbs_up": "play_pause",
         "peace": "next_track",
         "three_fingers": "previous_track",
         "thumb_pinky": "mute",
@@ -55,6 +56,12 @@ CONFIGURACAO_PADRAO: dict[str, dict[str, Any]] = {
     },
     "feedback": {"beep": True, "display_seconds": 1.5},
     "performance": {"camera_buffer": 1, "config_reload_seconds": 1.0},
+    "privacy": {
+        "blur_face": False,
+        "blur_strength": 51,
+        "blur_padding": 0.35,
+        "detect_every_n_frames": 5,
+    },
 }
 
 
@@ -142,6 +149,19 @@ def carregar_configuracao(caminho: str | Path = "config.toml") -> dict[str, dict
     _validar_numero(configuracao["feedback"]["display_seconds"], "feedback.display_seconds")
     _validar_inteiro(configuracao["performance"]["camera_buffer"], "performance.camera_buffer", 1)
     _validar_numero(configuracao["performance"]["config_reload_seconds"], "performance.config_reload_seconds")
+    if not isinstance(configuracao["privacy"]["blur_face"], bool):
+        raise ErroConfiguracao("'privacy.blur_face' deve ser true ou false.")
+    _validar_inteiro(configuracao["privacy"]["blur_strength"], "privacy.blur_strength", 3)
+    if configuracao["privacy"]["blur_strength"] % 2 == 0:
+        raise ErroConfiguracao("'privacy.blur_strength' deve ser um número ímpar.")
+    _validar_numero(
+        configuracao["privacy"]["blur_padding"], "privacy.blur_padding", 0.0, 2.0
+    )
+    _validar_inteiro(
+        configuracao["privacy"]["detect_every_n_frames"],
+        "privacy.detect_every_n_frames",
+        1,
+    )
     return configuracao
 
 

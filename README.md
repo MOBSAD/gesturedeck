@@ -7,9 +7,10 @@ GestureDeck é um motor configurável de gestos para Linux. Ele usa OpenCV e Med
 | Gesto | Padrão | Ação |
 | --- | --- | --- |
 | Pinça (`pinch`) | Polegar e indicador próximos | Volume contínuo |
-| Punho (`fist`) | Cinco dedos fechados | Play/pause |
-| Paz (`peace`) | Indicador e médio estendidos | Próxima faixa |
-| Três dedos (`three_fingers`) | Indicador, médio e anelar estendidos | Faixa anterior |
+| Punho (`fist`) | Cinco dedos fechados | Desativado por padrão |
+| Polegar para cima (`thumbs_up`) | Somente polegar estendido e afastado do indicador | Play/pause |
+| Paz (`peace`) | Indicador e médio estendidos; anelar e mínimo dobrados | Próxima faixa |
+| Três dedos (`three_fingers`) | Indicador, médio e anelar estendidos; mínimo dobrado | Faixa anterior |
 | Polegar e mínimo (`thumb_pinky`) | Somente polegar e mínimo estendidos | Alternar mute |
 | Palma aberta (`open_palm`) | Cinco dedos estendidos | Ativar/desativar o controle |
 
@@ -97,7 +98,8 @@ beep = true
 
 [gestures]
 pinch = "volume"
-fist = "play_pause"
+fist = ""
+thumbs_up = "play_pause"
 peace = "next_track"
 three_fingers = "previous_track"
 thumb_pinky = "mute"
@@ -121,6 +123,12 @@ display_seconds = 1.5
 [performance]
 camera_buffer = 1
 config_reload_seconds = 1.0
+
+[privacy]
+blur_face = false
+blur_strength = 51
+blur_padding = 0.35
+detect_every_n_frames = 5
 ```
 
 As únicas ações aceitas são `volume`, `play_pause`, `next_track`, `previous_track`, `mute` e a string vazia. `pinch` aceita somente `volume` ou vazio; ações discretas não aceitam `volume`.
@@ -139,6 +147,10 @@ A palma tem prioridade sobre todos os outros gestos e nunca dispara outra ação
 
 O arquivo é monitorado durante a execução. Alterações válidas são aplicadas sem interromper o loop; um TOML inválido mantém a última configuração válida. Mudanças de câmera, parâmetros internos do MediaPipe ou buffer são informadas como dependentes de reinicialização.
 
+## Privacidade
+
+Defina `privacy.blur_face = true` para desfocar rostos na janela. `blur_strength` controla a intensidade e deve ser um inteiro ímpar maior ou igual a 3. `blur_padding` amplia a área ao redor do rosto proporcionalmente: `0.0` usa apenas a caixa detectada, `0.35` adiciona 35% em cada lado e o máximo aceito é `2.0`. `detect_every_n_frames` reduz o custo da detecção reutilizando a última região encontrada. O `config.toml` incluído já deixa essa opção ativada.
+
 ## Interface
 
 No modo visível são mostrados estado, candidato, gesto confirmado, ação executada, volume e progresso de estabilidade. Candidato, confirmação, sucesso e erro usam cores diferentes. Com `interface.visible = false`, nenhuma função de janela do OpenCV é chamada; encerre com `Ctrl+C`.
@@ -154,6 +166,7 @@ Os testes não acessam webcam, áudio ou players reais.
 ## Limitações conhecidas
 
 - iluminação ruim, oclusões e mãos parcialmente fora do quadro reduzem a precisão;
+- o detector facial pode falhar em perfil, pouca luz ou oclusões; o desfoque ajuda, mas não garante anonimato absoluto;
 - os padrões são geométricos e podem exigir pequenos ajustes pessoais de pose;
 - a lateralidade depende da classificação do MediaPipe e da imagem espelhada;
 - `playerctl` só controla players compatíveis com MPRIS;

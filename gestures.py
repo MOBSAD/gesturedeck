@@ -7,7 +7,7 @@ import math
 from typing import Any
 
 
-GESTOS_DISCRETOS = {"fist", "peace", "three_fingers", "thumb_pinky"}
+GESTOS_DISCRETOS = {"fist", "peace", "three_fingers", "thumb_pinky", "thumbs_up"}
 
 
 def distancia(a: Any, b: Any) -> float:
@@ -40,12 +40,17 @@ def classificar_gesto(mao: Any) -> str | None:
     polegar, indicador, medio, anelar, minimo = estados_dedos(mao)
     if (polegar, indicador, medio, anelar, minimo) == (True, True, True, True, True):
         return "open_palm"
-    if not polegar and indicador and medio and anelar and not minimo:
+    if indicador and medio and anelar and not minimo:
         return "three_fingers"
-    if not polegar and indicador and medio and not anelar and not minimo:
+    if indicador and medio and not anelar and not minimo:
         return "peace"
     if polegar and not indicador and not medio and not anelar and minimo:
         return "thumb_pinky"
+    separacao_polegar = distancia(mao.landmark[4], mao.landmark[8]) / max(
+        distancia(mao.landmark[0], mao.landmark[9]), 1e-6
+    )
+    if polegar and not indicador and not medio and not anelar and not minimo and separacao_polegar > 0.7:
+        return "thumbs_up"
     if not indicador and not medio and not anelar and not minimo:
         return "fist"
     if indicador and not medio and not anelar and not minimo:

@@ -28,6 +28,8 @@ class TestConfiguracao(unittest.TestCase):
         self.assertEqual(config["camera"]["fps"], 24)
         self.assertTrue(config["activation"]["start_active"])
         self.assertEqual(config["gestures"], CONFIGURACAO_PADRAO["gestures"])
+        self.assertEqual(config["gestures"]["fist"], "")
+        self.assertEqual(config["gestures"]["thumbs_up"], "play_pause")
         self.assertEqual(config["gesture_detection"], CONFIGURACAO_PADRAO["gesture_detection"])
 
     def test_mapeamento_completo_e_acao_desativada(self):
@@ -61,6 +63,9 @@ mute = 2.0
             ("[gesture_detection]\nstability_seconds = -1\n", "gesture_detection.stability_seconds"),
             ("[gesture_cooldowns]\nmute = -0.1\n", "gesture_cooldowns.mute"),
             ("[tracking]\ncontrol_hand = \"both\"\n", "tracking.control_hand"),
+            ("[privacy]\nblur_face = \"yes\"\n", "privacy.blur_face"),
+            ("[privacy]\nblur_strength = 20\n", "privacy.blur_strength"),
+            ("[privacy]\nblur_padding = 3\n", "privacy.blur_padding"),
         )
         for conteudo, nome in casos:
             with self.subTest(nome=nome):

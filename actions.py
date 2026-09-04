@@ -17,8 +17,8 @@ import wave
 
 COMANDOS: dict[str, list[str]] = {
     "play_pause": ["playerctl", "play-pause"],
-    "next_track": ["playerctl", "next"],
-    "previous_track": ["playerctl", "previous"],
+    "next_track": ["playerctl", "--all-players", "next"],
+    "previous_track": ["playerctl", "--all-players", "previous"],
     "mute": ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"],
 }
 
@@ -124,9 +124,12 @@ class ExecutorAcoes:
                 argumentos,
                 check=True,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 timeout=2,
             )
+        except subprocess.CalledProcessError as erro:
+            detalhe = erro.stderr.decode().strip() if isinstance(erro.stderr, bytes) else str(erro.stderr or "").strip()
+            return ResultadoAcao(comando.acao, False, detalhe or str(erro))
         except (OSError, subprocess.SubprocessError) as erro:
             return ResultadoAcao(comando.acao, False, str(erro))
         return ResultadoAcao(comando.acao, True, "executada")
