@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from dataclasses import dataclass
 import math
 from pathlib import Path
@@ -166,10 +166,11 @@ class ExecutorAcoes:
 class WorkerAcoes:
     def __init__(self, executor: ExecutorAcoes, beep: bool = True) -> None:
         self.fila = FilaAcoes()
-        self.resultados: list[ResultadoAcao] = []
+        self.resultados: deque[ResultadoAcao] = deque(maxlen=32)
         self._executor = executor
         self._beep = beep
         self._lock = threading.Lock()
+        self._resultado_disponivel = threading.Event()
         self._thread = threading.Thread(target=self._processar, name="actions-worker")
 
     def iniciar(self) -> None:
@@ -178,10 +179,18 @@ class WorkerAcoes:
     def adicionar(self, acao: str, valor: float | str | None = None) -> None:
         self.fila.adicionar(Comando(acao, valor))
 
+    def configurar_beep(self, habilitado: bool) -> None:
+        self._beep = habilitado
+
     def coletar_resultados(self) -> list[ResultadoAcao]:
         with self._lock:
-            resultados, self.resultados = self.resultados, []
+            resultados = list(self.resultados)
+            self.resultados.clear()
+            self._resultado_disponivel.clear()
             return resultados
+
+    def aguardar_resultado(self, timeout: float) -> bool:
+        return self._resultado_disponivel.wait(timeout)
 
     def encerrar(self) -> None:
         self.fila.fechar()
@@ -202,9 +211,13 @@ class WorkerAcoes:
             if comando.acao == "beep":
                 self._executor.beep(str(comando.valor))
                 continue
-            resultado = self._executor.executar(comando)
+            try:
+                resultado = self._executor.executar(comando)
+            except Exception as erro:
+                resultado = ResultadoAcao(comando.acao, False, f"erro interno: {erro}")
             with self._lock:
                 self.resultados.append(resultado)
+                self._resultado_disponivel.set()
             if resultado.sucesso and self._beep and comando.acao not in {"volume"}:
                 self._executor.beep("confirm")
 

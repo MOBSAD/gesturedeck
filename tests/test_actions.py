@@ -23,6 +23,13 @@ class TestFilaAcoes(unittest.TestCase):
         self.assertEqual(fila.obter(0).valor, 0.8)
         self.assertEqual(fila.obter(0).acao, "mute")
 
+    def test_stress_nao_deixa_fila_crescer(self):
+        fila = FilaAcoes()
+        for indice in range(10_000):
+            fila.adicionar(Comando("volume", indice / 10_000))
+            fila.adicionar(Comando("mute"))
+        self.assertEqual(len(fila), 2)
+
 
 class TestExecutorAcoes(unittest.TestCase):
     def test_comandos_sao_listas_internas_sem_shell(self):
@@ -89,6 +96,18 @@ class TestWorker(unittest.TestCase):
         self.assertTrue(processou.wait(1))
         worker.encerrar()
         self.assertFalse(worker.ativo)
+
+    def test_excecao_no_executor_nao_impede_encerramento(self):
+        executor = Mock()
+        executor.executar.side_effect = RuntimeError("falha")
+        worker = WorkerAcoes(executor, beep=False)
+        worker.iniciar()
+        worker.adicionar("mute")
+        self.assertTrue(worker.aguardar_resultado(1))
+        resultados = worker.coletar_resultados()
+        worker.encerrar()
+        self.assertFalse(worker.ativo)
+        self.assertFalse(resultados[0].sucesso)
 
 
 class TestLimitadorVolume(unittest.TestCase):

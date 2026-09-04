@@ -1,7 +1,7 @@
 [project]
 name = "gesturedeck"
-version = "0.1.0"
-description = "Controle de volume por gestos capturados pela webcam"
+version = "0.2.0"
+description = "Motor configurável de gestos para mídia e volume no Linux"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 license = { file = "LICENSE" }
@@ -10,5 +10,12 @@ dependencies = [
     "opencv-python>=4.10,<5",
 ]
 
-[tool.uv]
-package = false
+[project.scripts]
+gesturedeck = "main:main"
+
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["main", "config", "gestures", "actions"]

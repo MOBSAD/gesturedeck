@@ -36,6 +36,7 @@ thumb_pinky = "mute"
 
 [gesture_detection]
 stability_seconds = 0.35
+loss_tolerance_seconds = 0.12
 release_seconds = 0.25
 default_cooldown = 1.0
 
@@ -44,3 +45,11 @@ play_pause = 1.0
 next_track = 1.0
 previous_track = 1.0
 mute = 1.0
+
+[feedback]
+beep = true
+display_seconds = 1.5
+
+[performance]
+camera_buffer = 1
+config_reload_seconds = 1.0

@@ -65,12 +65,22 @@ def selecionar_mao(resultado: Any, mao_controle: str) -> Any | None:
     return None
 
 
+def lateralidade_mao(resultado: Any, mao_selecionada: Any) -> str | None:
+    maos = getattr(resultado, "multi_hand_landmarks", None) or []
+    lateralidades = getattr(resultado, "multi_handedness", None) or []
+    for mao, lateralidade in zip(maos, lateralidades):
+        if mao is mao_selecionada and lateralidade.classification:
+            return lateralidade.classification[0].label.lower()
+    return None
+
+
 @dataclass(frozen=True)
 class EstadoGesto:
     candidato: str | None = None
     confirmado: str | None = None
     acao: str | None = None
     progresso: float = 0.0
+    fase: str = "neutro"
 
 
 class MotorGestos:
@@ -81,17 +91,20 @@ class MotorGestos:
         liberacao: float,
         cooldown_padrao: float,
         cooldowns: dict[str, float],
+        tolerancia_perda: float = 0.0,
     ) -> None:
         self.mapeamento = mapeamento
         self.estabilidade = estabilidade
         self.liberacao = liberacao
         self.cooldown_padrao = cooldown_padrao
         self.cooldowns = cooldowns
+        self.tolerancia_perda = tolerancia_perda
         self._candidato: str | None = None
         self._desde = 0.0
         self._bloqueado: str | None = None
         self._liberando_desde: float | None = None
         self._ultima_acao: dict[str, float] = {}
+        self._perdido_desde: float | None = None
 
     def atualizar(self, gesto: str | None, ativo: bool, agora: float) -> EstadoGesto:
         if self._bloqueado is not None:
@@ -103,26 +116,42 @@ class MotorGestos:
                 self._bloqueado = None
                 self._liberando_desde = None
 
-        if not ativo or gesto not in GESTOS_DISCRETOS:
+        if not ativo:
+            self._candidato = None
+            return EstadoGesto()
+        if gesto is None and self._candidato is not None:
+            if self._perdido_desde is None:
+                self._perdido_desde = agora
+            if agora - self._perdido_desde <= self.tolerancia_perda:
+                progresso = 1.0 if self.estabilidade == 0 else min(1.0, (self._perdido_desde - self._desde) / self.estabilidade)
+                return EstadoGesto(candidato=self._candidato, progresso=progresso, fase="candidato")
+            self._candidato = None
+        elif gesto == self._candidato and self._perdido_desde is not None:
+            self._desde += agora - self._perdido_desde
+            self._perdido_desde = None
+        elif gesto != self._candidato:
+            self._perdido_desde = None
+        if gesto not in GESTOS_DISCRETOS:
             self._candidato = None
             return EstadoGesto()
         acao = self.mapeamento.get(gesto, "")
         if not acao:
             self._candidato = None
-            return EstadoGesto(candidato=gesto)
+            return EstadoGesto(candidato=gesto, fase="candidato")
         if gesto != self._candidato:
             self._candidato = gesto
             self._desde = agora
         decorrido = agora - self._desde
         progresso = 1.0 if self.estabilidade == 0 else min(1.0, decorrido / self.estabilidade)
         if progresso < 1.0 or self._bloqueado == gesto:
-            return EstadoGesto(candidato=gesto, progresso=progresso)
+            fase = "aguardando_liberacao" if self._bloqueado == gesto else "candidato"
+            return EstadoGesto(candidato=gesto, progresso=progresso, fase=fase)
         cooldown = self.cooldowns.get(acao, self.cooldown_padrao)
         if agora - self._ultima_acao.get(acao, float("-inf")) < cooldown:
-            return EstadoGesto(candidato=gesto, progresso=1.0)
+            return EstadoGesto(candidato=gesto, progresso=1.0, fase="cooldown")
         self._ultima_acao[acao] = agora
         self._bloqueado = gesto
-        return EstadoGesto(candidato=gesto, confirmado=gesto, acao=acao, progresso=1.0)
+        return EstadoGesto(candidato=gesto, confirmado=gesto, acao=acao, progresso=1.0, fase="confirmado")
 
 
 class ControleAtivacao:

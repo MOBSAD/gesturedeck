@@ -43,6 +43,7 @@ CONFIGURACAO_PADRAO: dict[str, dict[str, Any]] = {
     },
     "gesture_detection": {
         "stability_seconds": 0.35,
+        "loss_tolerance_seconds": 0.12,
         "release_seconds": 0.25,
         "default_cooldown": 1.0,
     },
@@ -52,6 +53,8 @@ CONFIGURACAO_PADRAO: dict[str, dict[str, Any]] = {
         "previous_track": 1.0,
         "mute": 1.0,
     },
+    "feedback": {"beep": True, "display_seconds": 1.5},
+    "performance": {"camera_buffer": 1, "config_reload_seconds": 1.0},
 }
 
 
@@ -79,6 +82,7 @@ def _validar_numero(
 def carregar_configuracao(caminho: str | Path = "config.toml") -> dict[str, dict[str, Any]]:
     configuracao = copy.deepcopy(CONFIGURACAO_PADRAO)
     caminho = Path(caminho)
+    dados: dict[str, Any] = {}
     if caminho.exists():
         try:
             with caminho.open("rb") as arquivo:
@@ -127,8 +131,46 @@ def carregar_configuracao(caminho: str | Path = "config.toml") -> dict[str, dict
             raise ErroConfiguracao("'gestures.pinch' aceita somente 'volume' ou string vazia.")
         if gesto != "pinch" and acao == "volume":
             raise ErroConfiguracao(f"'gestures.{gesto}' não pode usar a ação contínua 'volume'.")
-    for opcao in ("stability_seconds", "release_seconds", "default_cooldown"):
+    for opcao in ("stability_seconds", "loss_tolerance_seconds", "release_seconds", "default_cooldown"):
         _validar_numero(configuracao["gesture_detection"][opcao], f"gesture_detection.{opcao}")
     for acao, cooldown in configuracao["gesture_cooldowns"].items():
         _validar_numero(cooldown, f"gesture_cooldowns.{acao}")
+    if "feedback" not in dados or "beep" not in dados.get("feedback", {}):
+        configuracao["feedback"]["beep"] = configuracao["activation"]["beep"]
+    if not isinstance(configuracao["feedback"]["beep"], bool):
+        raise ErroConfiguracao("'feedback.beep' deve ser true ou false.")
+    _validar_numero(configuracao["feedback"]["display_seconds"], "feedback.display_seconds")
+    _validar_inteiro(configuracao["performance"]["camera_buffer"], "performance.camera_buffer", 1)
+    _validar_numero(configuracao["performance"]["config_reload_seconds"], "performance.config_reload_seconds")
     return configuracao
+
+
+class RecarregadorConfiguracao:
+    """Detecta alterações e mantém a última configuração válida."""
+
+    def __init__(self, caminho: str | Path, intervalo: float, obter_mtime: Any = None) -> None:
+        self.caminho = Path(caminho)
+        self.intervalo = intervalo
+        self._obter_mtime = obter_mtime or (lambda path: path.stat().st_mtime_ns if path.exists() else None)
+        self._mtime = self._obter_mtime(self.caminho)
+        self._ultima_verificacao = float("-inf")
+        self._ultimo_erro: str | None = None
+
+    def verificar(self, agora: float) -> tuple[dict[str, dict[str, Any]] | None, str | None]:
+        if agora - self._ultima_verificacao < self.intervalo:
+            return None, None
+        self._ultima_verificacao = agora
+        mtime = self._obter_mtime(self.caminho)
+        if mtime == self._mtime:
+            return None, None
+        self._mtime = mtime
+        try:
+            configuracao = carregar_configuracao(self.caminho)
+        except ErroConfiguracao as erro:
+            mensagem = str(erro)
+            if mensagem == self._ultimo_erro:
+                return None, None
+            self._ultimo_erro = mensagem
+            return None, mensagem
+        self._ultimo_erro = None
+        return configuracao, None

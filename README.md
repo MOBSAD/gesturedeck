@@ -43,10 +43,21 @@ Se `playerctl` não existir, somente as ações de mídia ficam indisponíveis. 
 
 ```bash
 uv sync --python 3.12
-uv run python main.py
+uv run gesturedeck
 ```
 
 Use `Q` ou `Esc` na janela para sair. `Ctrl+C` funciona nos modos visível e oculto. A câmera e o worker de ações são encerrados mesmo quando ocorre erro.
+
+### CLI e diagnóstico
+
+```bash
+uv run gesturedeck                              # execução normal
+uv run gesturedeck --config outro/config.toml  # configuração alternativa
+uv run gesturedeck --headless                   # força o modo sem janela
+uv run gesturedeck --check                      # valida TOML e dependências
+uv run gesturedeck --list-cameras               # procura índices V4L2
+uv run gesturedeck --version
+```
 
 ## Configuração
 
@@ -93,6 +104,7 @@ thumb_pinky = "mute"
 
 [gesture_detection]
 stability_seconds = 0.35
+loss_tolerance_seconds = 0.12
 release_seconds = 0.25
 default_cooldown = 1.0
 
@@ -101,6 +113,14 @@ play_pause = 1.0
 next_track = 1.0
 previous_track = 1.0
 mute = 1.0
+
+[feedback]
+beep = true
+display_seconds = 1.5
+
+[performance]
+camera_buffer = 1
+config_reload_seconds = 1.0
 ```
 
 As únicas ações aceitas são `volume`, `play_pause`, `next_track`, `previous_track`, `mute` e a string vazia. `pinch` aceita somente `volume` ou vazio; ações discretas não aceitam `volume`.
@@ -108,6 +128,7 @@ As únicas ações aceitas são `volume`, `play_pause`, `next_track`, `previous_
 ## Estabilidade e ativação
 
 - `stability_seconds`: tempo durante o qual um gesto discreto precisa permanecer reconhecido;
+- `loss_tolerance_seconds`: tolerância para uma falha curta de detecção sem perder o candidato;
 - `release_seconds`: tempo sem o mesmo gesto antes de ele poder disparar novamente;
 - `default_cooldown`: intervalo padrão entre execuções da mesma ação;
 - `gesture_cooldowns`: sobrescreve o cooldown por ação;
@@ -115,6 +136,8 @@ As únicas ações aceitas são `volume`, `play_pause`, `next_track`, `previous_
 - `activation.cooldown`: intervalo entre alternâncias de ativação.
 
 A palma tem prioridade sobre todos os outros gestos e nunca dispara outra ação no mesmo instante. Depois de alternar, é preciso fechar ou retirar a mão. Enquanto `INATIVO`, todos os gestos são ignorados, exceto a palma aberta. A pinça é contínua e não usa a estabilidade dos gestos discretos.
+
+O arquivo é monitorado durante a execução. Alterações válidas são aplicadas sem interromper o loop; um TOML inválido mantém a última configuração válida. Mudanças de câmera, parâmetros internos do MediaPipe ou buffer são informadas como dependentes de reinicialização.
 
 ## Interface
 

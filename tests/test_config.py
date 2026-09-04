@@ -2,7 +2,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from config import CONFIGURACAO_PADRAO, ErroConfiguracao, carregar_configuracao
+from config import (
+    CONFIGURACAO_PADRAO,
+    ErroConfiguracao,
+    RecarregadorConfiguracao,
+    carregar_configuracao,
+)
 
 
 class TestConfiguracao(unittest.TestCase):
@@ -61,3 +66,25 @@ mute = 2.0
             with self.subTest(nome=nome):
                 with self.assertRaisesRegex(ErroConfiguracao, nome.replace(".", r"\.")):
                     self._carregar(conteudo)
+
+    def test_recarrega_so_quando_altera_e_preserva_ultima_valida(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "config.toml"
+            caminho.write_text("[camera]\nfps = 24\n", encoding="utf-8")
+            mtime = [1]
+            recarregador = RecarregadorConfiguracao(
+                caminho, intervalo=1.0, obter_mtime=lambda _: mtime[0]
+            )
+            self.assertEqual(recarregador.verificar(0.0), (None, None))
+            caminho.write_text("[camera]\nfps = 25\n", encoding="utf-8")
+            mtime[0] = 2
+            nova, erro = recarregador.verificar(1.0)
+            self.assertIsNone(erro)
+            self.assertEqual(nova["camera"]["fps"], 25)
+            caminho.write_text("[camera]\nfps = 0\n", encoding="utf-8")
+            mtime[0] = 3
+            nova, erro = recarregador.verificar(2.0)
+            self.assertIsNone(nova)
+            self.assertIn("camera.fps", erro)
+            mtime[0] = 4
+            self.assertEqual(recarregador.verificar(3.0), (None, None))

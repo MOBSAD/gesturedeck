@@ -94,6 +94,15 @@ class TestMotorTemporal(unittest.TestCase):
         self.assertEqual(self.motor.atualizar("fist", True, 0.35).acao, "play_pause")
         self.assertIsNone(self.motor.atualizar("fist", True, 1.0).acao)
 
+    def test_perda_curta_nao_reinicia_estabilidade(self):
+        motor = MotorGestos(
+            {"peace": "next_track"}, 0.35, 0.25, 1.0, {}, tolerancia_perda=0.15
+        )
+        motor.atualizar("peace", True, 0.0)
+        self.assertEqual(motor.atualizar(None, True, 0.15).candidato, "peace")
+        motor.atualizar("peace", True, 0.25)
+        self.assertEqual(motor.atualizar("peace", True, 0.55).acao, "next_track")
+
     def test_exige_liberacao_e_respeita_cooldown(self):
         self.motor.atualizar("fist", True, 0.0)
         self.motor.atualizar("fist", True, 0.4)
@@ -114,3 +123,5 @@ class TestMotorTemporal(unittest.TestCase):
         self.assertTrue(alternou)
         self.assertTrue(ativacao.ativo)
         self.assertIsNone(estado.acao)
+        alternou, _ = processar_estado_gesto("open_palm", 2.0, ativacao, self.motor)
+        self.assertFalse(alternou)
