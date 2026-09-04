@@ -26,3 +26,21 @@ hold_seconds = 0.8
 cooldown = 1.5
 start_active = false
 beep = true
+
+[gestures]
+pinch = "volume"
+fist = "play_pause"
+peace = "next_track"
+three_fingers = "previous_track"
+thumb_pinky = "mute"
+
+[gesture_detection]
+stability_seconds = 0.35
+release_seconds = 0.25
+default_cooldown = 1.0
+
+[gesture_cooldowns]
+play_pause = 1.0
+next_track = 1.0
+previous_track = 1.0
+mute = 1.0

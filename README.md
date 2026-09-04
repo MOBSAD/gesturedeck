@@ -1,67 +1,124 @@
 # GestureDeck
 
-GestureDeck é um aplicativo simples para Linux que usa a webcam para controlar o volume do sistema. O MediaPipe detecta até duas mãos, seleciona a lateralidade configurada e usa a distância entre as pontas do polegar e do indicador para definir o volume. As mudanças são suavizadas antes de serem enviadas ao PipeWire com `wpctl`.
+GestureDeck é um motor configurável de gestos para Linux. Ele usa OpenCV e MediaPipe para reconhecer uma mão pela webcam e controla volume, mute e reprodução de mídia sem bloquear a captura. Os comandos permitidos são definidos internamente; o arquivo TOML não executa comandos shell arbitrários.
 
-## Requisitos
+## Gestos
 
-- Linux com PipeWire e o comando `wpctl` disponível
-- `pw-play` para os avisos sonoros (opcional; o controle funciona sem ele)
-- webcam acessível no dispositivo definido em `config.toml` (por padrão, `/dev/video0`)
+| Gesto | Padrão | Ação |
+| --- | --- | --- |
+| Pinça (`pinch`) | Polegar e indicador próximos | Volume contínuo |
+| Punho (`fist`) | Cinco dedos fechados | Play/pause |
+| Paz (`peace`) | Indicador e médio estendidos | Próxima faixa |
+| Três dedos (`three_fingers`) | Indicador, médio e anelar estendidos | Faixa anterior |
+| Polegar e mínimo (`thumb_pinky`) | Somente polegar e mínimo estendidos | Alternar mute |
+| Palma aberta (`open_palm`) | Cinco dedos estendidos | Ativar/desativar o controle |
+
+Somente a mão escolhida em `tracking.control_hand` é processada. Com `"any"`, a primeira mão retornada pelo MediaPipe é usada.
+
+## Dependências
+
+### Python
+
 - Python 3.12
 - [`uv`](https://docs.astral.sh/uv/)
-- ambiente gráfico para exibir a imagem da câmera
+- `mediapipe==0.10.21` e OpenCV, instalados pelo `uv`
 
-## Instalação
+### Sistema
+
+- webcam compatível com V4L2;
+- PipeWire/WirePlumber e `wpctl`, necessários para volume e mute;
+- `playerctl`, necessário para play/pause e troca de faixas;
+- `pw-play`, opcional, para os beeps;
+- sessão gráfica somente quando `interface.visible = true`.
+
+No Arch Linux, instale o suporte de mídia com:
+
+```bash
+pacman -S playerctl
+```
+
+Se `playerctl` não existir, somente as ações de mídia ficam indisponíveis. Sem `pw-play`, apenas os beeps são desativados. Sem `wpctl`, volume e mute ficam indisponíveis. Cada ausência gera um único aviso no terminal.
+
+## Instalação e execução
 
 ```bash
 uv sync --python 3.12
-```
-
-## Execução
-
-```bash
 uv run python main.py
 ```
 
-## Controles
-
-- aproxime o polegar e o indicador para diminuir o volume;
-- afaste os dedos para aumentar o volume;
-- mantenha a palma aberta por 0,8 segundo para ativar ou desativar o controle;
-- pressione `Q` ou `Esc` na janela da câmera para sair;
-- pressione `Ctrl+C` no terminal para encerrar.
-
-A câmera é liberada ao sair normalmente e também quando ocorre um erro.
+Use `Q` ou `Esc` na janela para sair. `Ctrl+C` funciona nos modos visível e oculto. A câmera e o worker de ações são encerrados mesmo quando ocorre erro.
 
 ## Configuração
 
-Edite `config.toml` antes de executar. Opções ausentes usam os valores padrão abaixo.
+Edite `config.toml`. Se o arquivo, uma seção ou uma opção conhecida não existir, o valor padrão correspondente é usado. Uma string vazia desativa um gesto, por exemplo `peace = ""`.
 
-| Opção | Padrão | Descrição |
-| --- | ---: | --- |
-| `interface.visible` | `true` | Exibe a janela; `false` executa em modo oculto. |
-| `camera.device` | `0` | Índice da câmera (`/dev/videoN`). |
-| `camera.width` / `height` | `640` / `480` | Resolução solicitada. |
-| `camera.fps` | `30` | Taxa de quadros solicitada. |
-| `tracking.process_every_n_frames` | `2` | Processa a mão a cada N quadros. |
-| `tracking.detection_confidence` | `0.65` | Confiança mínima de detecção, entre 0 e 1. |
-| `tracking.tracking_confidence` | `0.65` | Confiança mínima de rastreamento, entre 0 e 1. |
-| `tracking.control_hand` | `"any"` | Mão controladora: `"left"`, `"right"` ou qualquer mão com `"any"`. |
-| `volume.minimum_distance` / `maximum_distance` | `25` / `180` | Distâncias dos dedos para volume mínimo e máximo. |
-| `volume.smoothing` | `0.18` | Fator de suavização, entre 0 e 1. |
-| `volume.update_interval` | `0.15` | Intervalo mínimo entre comandos, em segundos. |
-| `volume.minimum_change` | `0.03` | Mudança mínima de volume, entre 0 e 1. |
-| `activation.enabled` | `true` | Habilita a alternância por palma aberta. |
-| `activation.hold_seconds` | `0.8` | Tempo durante o qual a palma deve permanecer aberta. |
-| `activation.cooldown` | `1.5` | Intervalo mínimo entre alternâncias, em segundos. |
-| `activation.start_active` | `false` | Inicia o controle de volume ativo. |
-| `activation.beep` | `true` | Toca aviso agudo ao ativar e grave ao desativar. |
+Exemplo completo com os valores padrão:
 
-Com `interface.visible = false`, nenhuma janela é criada; encerre o programa com `Ctrl+C`.
+```toml
+[interface]
+visible = true
 
-Os valores `"left"` e `"right"` seguem a classificação de lateralidade retornada pelo MediaPipe. Quando as duas mãos aparecem, somente a mão configurada controla o volume.
+[camera]
+device = 0
+width = 640
+height = 480
+fps = 30
 
-Somente a mão selecionada por `tracking.control_hand` pode alternar o estado. Após uma alternância, feche ou retire a mão antes de usar a palma aberta novamente. Enquanto estiver `INATIVO`, nenhum gesto altera o volume.
+[tracking]
+process_every_n_frames = 2
+detection_confidence = 0.65
+tracking_confidence = 0.65
+control_hand = "any"
+
+[volume]
+minimum_distance = 25
+maximum_distance = 180
+smoothing = 0.18
+update_interval = 0.15
+minimum_change = 0.03
+
+[activation]
+enabled = true
+hold_seconds = 0.8
+cooldown = 1.5
+start_active = false
+beep = true
+
+[gestures]
+pinch = "volume"
+fist = "play_pause"
+peace = "next_track"
+three_fingers = "previous_track"
+thumb_pinky = "mute"
+
+[gesture_detection]
+stability_seconds = 0.35
+release_seconds = 0.25
+default_cooldown = 1.0
+
+[gesture_cooldowns]
+play_pause = 1.0
+next_track = 1.0
+previous_track = 1.0
+mute = 1.0
+```
+
+As únicas ações aceitas são `volume`, `play_pause`, `next_track`, `previous_track`, `mute` e a string vazia. `pinch` aceita somente `volume` ou vazio; ações discretas não aceitam `volume`.
+
+## Estabilidade e ativação
+
+- `stability_seconds`: tempo durante o qual um gesto discreto precisa permanecer reconhecido;
+- `release_seconds`: tempo sem o mesmo gesto antes de ele poder disparar novamente;
+- `default_cooldown`: intervalo padrão entre execuções da mesma ação;
+- `gesture_cooldowns`: sobrescreve o cooldown por ação;
+- `activation.hold_seconds`: duração da palma aberta para alternar o estado;
+- `activation.cooldown`: intervalo entre alternâncias de ativação.
+
+A palma tem prioridade sobre todos os outros gestos e nunca dispara outra ação no mesmo instante. Depois de alternar, é preciso fechar ou retirar a mão. Enquanto `INATIVO`, todos os gestos são ignorados, exceto a palma aberta. A pinça é contínua e não usa a estabilidade dos gestos discretos.
+
+## Interface
+
+No modo visível são mostrados estado, candidato, gesto confirmado, ação executada, volume e progresso de estabilidade. Candidato, confirmação, sucesso e erro usam cores diferentes. Com `interface.visible = false`, nenhuma função de janela do OpenCV é chamada; encerre com `Ctrl+C`.
 
 ## Testes
 
@@ -69,13 +126,16 @@ Somente a mão selecionada por `tracking.control_hand` pode alternar o estado. A
 uv run python -m unittest discover -s tests -v
 ```
 
-## Problemas comuns
+Os testes não acessam webcam, áudio ou players reais.
 
-- **A câmera não abre:** confira se o dispositivo indicado em `camera.device` existe, se seu usuário tem permissão e se outro programa não está usando a webcam.
-- **O volume não muda:** execute `wpctl status` para confirmar que PipeWire/WirePlumber está ativo e que existe uma saída de áudio padrão.
-- **O aviso sonoro não toca:** confirme que `pw-play` está disponível. Sem ele, o GestureDeck mostra um aviso e continua normalmente sem som.
-- **A janela não aparece:** confirme que há uma sessão gráfica ativa.
-- **A mão não é detectada:** use boa iluminação e mantenha a mão inteira visível.
+## Limitações conhecidas
+
+- iluminação ruim, oclusões e mãos parcialmente fora do quadro reduzem a precisão;
+- os padrões são geométricos e podem exigir pequenos ajustes pessoais de pose;
+- a lateralidade depende da classificação do MediaPipe e da imagem espelhada;
+- `playerctl` só controla players compatíveis com MPRIS;
+- resolução e FPS solicitados dependem do suporte real da webcam;
+- com `tracking.control_hand = "any"` e duas mãos visíveis, a mão escolhida pode mudar conforme a ordem da detecção.
 
 ## Licença
 
