@@ -1,0 +1,25 @@
+import unittest
+
+from main import converter_distancia_em_volume, limitar, suavizar_volume
+
+
+class TestLogicaDeVolume(unittest.TestCase):
+    def test_limitar(self):
+        self.assertEqual(limitar(-1, 0, 1), 0)
+        self.assertEqual(limitar(2, 0, 1), 1)
+        self.assertEqual(limitar(0.4, 0, 1), 0.4)
+
+    def test_distancia_e_convertida_e_limitada(self):
+        self.assertEqual(converter_distancia_em_volume(25), 0)
+        self.assertEqual(converter_distancia_em_volume(180), 1)
+        self.assertEqual(converter_distancia_em_volume(0), 0)
+        self.assertEqual(converter_distancia_em_volume(500), 1)
+
+    def test_suavizacao_aproxima_o_alvo(self):
+        self.assertAlmostEqual(suavizar_volume(0.0, 1.0, 0.2), 0.2)
+        self.assertAlmostEqual(suavizar_volume(1.0, 0.0, 0.2), 0.8)
+        self.assertEqual(suavizar_volume(0.3, 1.0, 0.0), 0.3)
+
+
+if __name__ == "__main__":
+    unittest.main()
